@@ -19,7 +19,7 @@ const DataLoader = ({ onDataLoaded }) => {
       })
   }, [onDataLoaded]) // Dependency array: re-run if onDataLoaded changes
 
-  return <p>Loading data...</p>;
+  return 
 
   // if (!data) return <p>Loading...</p> // Display loading state
 
