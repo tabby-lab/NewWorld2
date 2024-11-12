@@ -1,313 +1,110 @@
 import React, { useEffect, useRef, useState } from 'react'
 import * as d3 from 'd3'
-import worldData from '../assets/countries.geo.json' // GeoJSON file path
-import SidePanel from './SidePanel' // Import SidePanel
 
-const D3Chart = ({ data, onHover }) => {
+const D3Chart = ({ data, setSelectedCountry, zoomLevel }) => {
   const svgRef = useRef()
   const [geoData, setGeoData] = useState(null)
-  const [selectedCountry, setSelectedCountry] = useState(null)
+
+  // Filter the data to include only 2022
+  const filteredData = data.filter((country) => country.year === 2022)
 
   useEffect(() => {
-    setGeoData(worldData)
+    const fetchGeoData = async () => {
+      try {
+        const response = await fetch('/assets/countries.geo.json')
+        if (!response.ok) throw new Error('Failed to fetch GeoJSON')
+        const geoJson = await response.json()
+        setGeoData(geoJson)
+      } catch (error) {
+        console.error('Error fetching GeoJSON:', error)
+      }
+    }
+
+    fetchGeoData()
   }, [])
 
   useEffect(() => {
     if (geoData) {
-      drawMap()
+      drawMap(geoData)
     }
-  }, [geoData, data])
+  }, [geoData, zoomLevel])
 
-  const drawMap = () => {
+  const drawMap = (geoJson) => {
     const svg = d3.select(svgRef.current)
+    svg.selectAll('*').remove() // Clear previous drawings
+
     const width = 800
     const height = 400
 
     const projection = d3
       .geoMercator()
-      .scale(130)
+      .scale(130 * zoomLevel) // Use zoom level for scaling
       .translate([width / 2, height / 1.5])
+
     const path = d3.geoPath().projection(projection)
 
     const colorScale = d3
       .scaleSequential()
-      .domain([3, 10]) // Adjust based on your data range
+      .domain([3, 10])
       .interpolator(d3.interpolateBlues)
 
-    svg
-      .selectAll('path')
-      .data(geoData.features)
+    const g = svg.append('g')
+
+    // Create zoom behavior
+    const zoomHandler = d3
+      .zoom()
+      .scaleExtent([1, 10]) // Set the scale limits
+      .on('zoom', (event) => {
+        g.attr('transform', event.transform)
+      })
+
+    // Apply zoom handler to the SVG
+    svg.call(zoomHandler)
+
+    g.selectAll('path')
+      .data(geoJson.features)
       .join('path')
       .attr('d', path)
       .attr('fill', (d) => {
         const countryCode = d.properties.name
-        const countryData = data.find(
-          (country) =>
-            country['Country Name'] === countryCode &&
-            country['Year'] === '2022'
+        const countryData = filteredData.find(
+          (country) => country.country_name === countryCode
         )
         return countryData
-          ? colorScale(
-              countryData[
-                'Unemployment, total (% of total labor force) (modeled ILO estimate)'
-              ]
-            )
+          ? colorScale(parseFloat(countryData.unemployment_rate))
           : '#ccc'
       })
       .attr('stroke', '#333')
       .attr('stroke-width', 0.5)
-      .on('mouseover', function (event, d) {
+      .on('mouseover', function () {
         d3.select(this).attr('stroke-width', 1.5)
-        //         onHover(d)
       })
       .on('mouseout', function () {
         d3.select(this).attr('stroke-width', 0.5)
-        //         onHover(null)
       })
       .on('click', function (event, d) {
         const countryCode = d.properties.name
-        const countryData = data.find(
-          (country) =>
-            country['Country Name'] === countryCode &&
-            country['Year'] === '2022'
+        const countryData = filteredData.find(
+          (country) => country.country_name === countryCode
         )
         setSelectedCountry(countryData || null)
       })
       .append('title')
       .text((d) => {
-        const countryData = data.find(
-          (country) =>
-            country['Country Name'] === d.properties.name &&
-            country['Year'] === '2022'
+        const countryData = filteredData.find(
+          (country) => country.country_name === d.properties.name
         )
         return countryData
-          ? countryData['Country Name'] +
-              ' : ' +
-              countryData[
-                'Unemployment, total (% of total labor force) (modeled ILO estimate)'
-              ]
+          ? `${countryData.country_name}: ${countryData.unemployment_rate}`
           : 'No data'
       })
   }
 
-  const handleClosePanel = () => {
-    setSelectedCountry(null)
-  }
-
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
       <svg ref={svgRef} width={800} height={400}></svg>
-      {selectedCountry && (
-        <SidePanel country={selectedCountry} onClose={handleClosePanel} />
-      )}
     </div>
   )
 }
 
 export default D3Chart
-
-// import React, { useEffect, useRef, useState } from 'react'
-// import * as d3 from 'd3'
-// import worldData from '../assets/countries.geo.json' // GeoJSON file path
-// import SidePanel from './SidePanel' // Import SidePanel
-
-// const D3Chart = ({ data, onHover }) => {
-//   const svgRef = useRef()
-//   const [geoData, setGeoData] = useState(null)
-//   const [selectedCountry, setSelectedCountry] = useState(null)
-
-//   useEffect(() => {
-//     setGeoData(worldData)
-//   }, [])
-
-//   useEffect(() => {
-//     if (geoData) {
-//       drawMap()
-//     }
-//   }, [geoData, data])
-
-//   const drawMap = () => {
-//     const svg = d3.select(svgRef.current)
-//     const width = 800
-//     const height = 400
-
-//     const projection = d3
-//       .geoMercator()
-//       .scale(130)
-//       .translate([width / 2, height / 1.5])
-//     const path = d3.geoPath().projection(projection)
-
-//     const colorScale = d3
-//       .scaleSequential()
-//       .domain([3, 10]) // Adjust based on your data range
-//       .interpolator(d3.interpolateBlues)
-
-//     svg
-//       .selectAll('path')
-//       .data(geoData.features)
-//       .join('path')
-//       .attr('d', path)
-//       .attr('fill', (d) => {
-//         const countryCode = d.properties.name
-//         const countryData = data.find(
-//           (country) => country['Country Name'] === countryCode
-//         )
-//         return countryData
-//           ? colorScale(
-//               countryData[
-//                 'Unemployment, total (% of total labor force) (modeled ILO estimate)'
-//               ]
-//             )
-//           : '#ccc'
-//       })
-//       .attr('stroke', '#333')
-//       .attr('stroke-width', 0.5)
-//       .on('mouseover', function (event, d) {
-//         d3.select(this).attr('stroke-width', 1.5)
-//         //         onHover(d)
-//       })
-//       .on('mouseout', function () {
-//         d3.select(this).attr('stroke-width', 0.5)
-//         //         onHover(null)
-//       })
-//       .on('click', function (event, d) {
-//         const countryCode = d.properties.name
-//         const countryData = data.find(
-//           (country) => country['Country Name'] === countryCode
-//         )
-//         setSelectedCountry(countryData || null)
-//       })
-//       .append('title')
-//       .text((d) => {
-//         const countryData = data.find(
-//           (country) => country['Country Name'] === d.properties.name
-//         )
-//         return countryData
-//           ? countryData['Country Name'] +
-//               ' : ' +
-//               countryData[
-//                 'Unemployment, total (% of total labor force) (modeled ILO estimate)'
-//               ]
-//           : 'No data'
-//       })
-//   }
-
-//   const handleClosePanel = () => {
-//     setSelectedCountry(null)
-//   }
-
-//   return (
-//     <div>
-//       <svg ref={svgRef} width={800} height={400}></svg>
-//       {selectedCountry && (
-//         <SidePanel country={selectedCountry} onClose={handleClosePanel} />
-//       )}
-//     </div>
-//   )
-// }
-
-// export default D3Chart
-
-// //old code
-
-// // import React, { useEffect, useRef, useState } from 'react'
-// // import * as d3 from 'd3'
-// // import worldData from '../assets/countries.geo.json' // GeoJSON file path
-// // import SidePanel from './SidePanel' // Import SidePanel
-
-// // const D3Chart = ({ data, onHover }) => {
-// //   const svgRef = useRef()
-// //   const [geoData, setGeoData] = useState(null)
-// //   const [selectedCountry, setSelectedCountry] = useState(null)
-
-// //   useEffect(() => {
-// //     setGeoData(worldData)
-// //   }, [])
-
-// //   useEffect(() => {
-// //     if (geoData) {
-// //       drawMap()
-// //     }
-// //   }, [geoData, data])
-
-// //   const drawMap = () => {
-// //     const svg = d3.select(svgRef.current)
-// //     const width = 800
-// //     const height = 400
-
-// //     const projection = d3
-// //       .geoMercator()
-// //       .scale(130)
-// //       .translate([width / 2, height / 1.5])
-// //     const path = d3.geoPath().projection(projection)
-
-// //     const colorScale = d3
-// //       .scaleSequential()
-// //       .domain([3, 10]) // Adjust based on your data range
-// //       .interpolator(d3.interpolateBlues)
-
-// //     svg
-// //       .selectAll('path')
-// //       .data(geoData.features)
-// //       .join('path')
-// //       .attr('d', path)
-// //       .attr('fill', (d) => {
-// //         const countryCode = d.properties.name
-// //         const countryData = data.find(
-// //           (country) => country['Country Name'] === countryCode
-// //         )
-// //         return countryData
-// //           ? colorScale(
-// //               countryData[
-// //                 'Unemployment, total (% of total labor force) (modeled ILO estimate)'
-// //               ]
-// //             )
-// //           : '#ccc'
-// //       })
-// //       .attr('stroke', '#333')
-// //       .attr('stroke-width', 0.5)
-// //       .on('mouseover', function (event, d) {
-// //         d3.select(this).attr('stroke-width', 1.5);
-// // //         onHover(d)
-// //       })
-// //       .on('mouseout', function () {
-// //         d3.select(this).attr('stroke-width', 0.5);
-// // //         onHover(null)
-// //       })
-// //       .on('click', function (event, d) {
-// //         const countryCode = d.properties.name
-// //         const countryData = data.find(
-// //           (country) => country['Country Name'] === countryCode
-// //         )
-// //         setSelectedCountry(countryData || null)
-// //       })
-// //       .append('title')
-// //       .text((d) => {
-// //         const countryData = data.find(
-// //           (country) => country['Country Name'] === d.properties.name
-// //         )
-// //         return countryData
-// //           ? countryData['Country Name'] +
-// //               ' : ' +
-// //               countryData[
-// //                 'Unemployment, total (% of total labor force) (modeled ILO estimate)'
-// //               ]
-// //           : 'No data'
-// //       })
-// //   }
-
-// //   const handleClosePanel = () => {
-// //     setSelectedCountry(null)
-// //   }
-
-// //   return (
-// //     <div>
-// //       <svg ref={svgRef} width={800} height={400}></svg>
-// //       {selectedCountry && (
-// //         <SidePanel country={selectedCountry} onClose={handleClosePanel} />
-// //       )}
-// //     </div>
-// //   )
-// // }
-
-// // export default D3Chart

@@ -1,35 +1,23 @@
-// src/components/DataLoader.jsx
+import React, { useEffect } from 'react'
+import axios from 'axios'
 
-import React, { useState, useEffect } from 'react'
-import { csv } from 'd3-fetch' // Import d3-fetch for loading CSV
-
-const DataLoader = ({ onDataLoaded }) => {
-  const [data, setData] = useState(null)
-
+const DataLoader = ({ onDataLoaded, onError }) => {
   useEffect(() => {
-    // Load CSV data from a relative path
-    csv('/data/WorldBank_Data.csv')
-      .then((data) => {
-        console.log(data) // Check if data is loaded correctly
-        setData(data) // Update state with the loaded data
-        onDataLoaded(data) // Pass data to parent or handler
-      })
-      .catch((error) => {
-        console.error('Error loading CSV data:', error)
-      })
-  }, [onDataLoaded]) // Dependency array: re-run if onDataLoaded changes
+    const fetchData = async () => {
+      try {
+        const response = await axios.get('http://localhost:5001/api/d3data') // API endpoint
+        console.log('Fetched Data:', response.data) // Log the fetched data
+        onDataLoaded(response.data) // Pass data to parent
+      } catch (error) {
+        console.error('Error loading data from API:', error)
+        if (onError) onError(error.message) // Handle errors
+      }
+    }
 
-  return 
+    fetchData()
+  }, [onDataLoaded, onError])
 
-  // if (!data) return <p>Loading...</p> // Display loading state
-
-  // return (
-  //   <div>
-  //     <h2>Data Loaded</h2>
-  //     {/* Render or process the data here */}
-  //     <pre>{JSON.stringify(data, null, 2)}</pre>
-  //   </div>
-  // )
+  // return <p>Loading data...</p> // Loading message
 }
 
 export default DataLoader
